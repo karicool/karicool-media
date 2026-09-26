@@ -127,6 +127,11 @@
   .file-preview { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .file-preview img, .file-preview video { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bordure); }
   .hint { font-size: 12px; color: var(--texte-mute); margin-top: 4px; }
+  .current-media-preview { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch; }
+  .current-media-preview img, .current-media-preview video {
+    height: 180px; width: auto; max-width: 260px; flex-shrink: 0;
+    border-radius: 12px; border: 1px solid var(--bordure); object-fit: cover; background: var(--nuage);
+  }
   .modal-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 22px; }
   .modal-actions-right { display: flex; gap: 8px; }
   .readonly-info { background: var(--nuage); border-radius: 12px; padding: 14px 16px; font-size: 13.5px; color: var(--texte-secondaire); margin-bottom: 14px; white-space: pre-wrap; }
@@ -497,10 +502,17 @@
     })());
 
     function currentMediaSummary() {
-      if (state.image_url) return el("div", { class: "hint" }, ["Visuel actuel : 1 image"]);
-      if (state.image_urls) return el("div", { class: "hint" }, [`Visuel actuel : carrousel de ${state.image_urls.length} image(s)`]);
-      if (state.video_url) return el("div", { class: "hint" }, ["Visuel actuel : 1 vidéo"]);
-      return null;
+      const items = [];
+      if (state.image_url) items.push({ type: "image", src: state.image_url });
+      if (state.image_urls) state.image_urls.forEach(u => items.push({ type: "image", src: u }));
+      if (state.video_url) items.push({ type: "video", src: state.video_url });
+      if (items.length === 0) return null;
+      const strip = el("div", { class: "current-media-preview" }, items.map(it =>
+        it.type === "image"
+          ? el("img", { src: it.src, loading: "lazy" })
+          : el("video", { src: it.src, controls: "", muted: "", playsinline: "", preload: "metadata" })
+      ));
+      return field(items.length > 1 ? `Visuel actuel (${items.length} images)` : "Visuel actuel", strip);
     }
 
     const platformToggle = el("div", { class: "platform-toggle" }, [
