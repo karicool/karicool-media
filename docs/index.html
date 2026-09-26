@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Karicool</title>
+<meta name="description" content="Calendrier et composeur de publications Instagram et LinkedIn de Karim.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bleu-nuit: #0B3A8C;
+    --bleu-karicool: #1A5FD6;
+    --bleu-ciel: #1E8FE8;
+    --nuage: #F3F7FD;
+    --bordure: #DCE5F3;
+    --texte: #10224A;
+    --texte-secondaire: #3B4B6E;
+    --texte-mute: #5A6B8C;
+    --fond: #FFFFFF;
+    --carte: #FFFFFF;
+
+    --menthe-bg: #E3F7EC; --menthe-fg: #146B43; --menthe: #5FD39A;
+    --turquoise-bg: #DDF5F5; --turquoise-fg: #0B6B6C; --turquoise: #14BFC0;
+    --soleil-bg: #FEF2D6; --soleil-fg: #8A5A00; --soleil: #FBB935;
+    --erreur-bg: #FDE7E2; --erreur-fg: #8A2E1C; --erreur: #E8573F;
+    --insta-bg: #EFE9FE; --insta-fg: #5B3FC4;
+    --linkedin-bg: #E4EDFB; --linkedin-fg: #0B3A8C;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--nuage); color: var(--texte); font-family: 'DM Sans', sans-serif; font-size: 15px; }
+  h1, h2, h3, .nunito { font-family: 'Nunito', sans-serif; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; font-size: 14px; }
+
+  .topbar {
+    background: var(--fond); border-bottom: 1px solid var(--bordure);
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .wordmark { font-weight: 900; font-size: 22px; color: var(--bleu-nuit); margin: 0; }
+  .wordmark span { color: var(--menthe); }
+  .tabs { display: flex; gap: 6px; }
+  .tab-btn {
+    border: 1px solid var(--bordure); background: var(--fond); color: var(--texte-secondaire);
+    padding: 8px 16px; border-radius: 12px; font-weight: 700; font-size: 13.5px;
+  }
+  .tab-btn.active { background: var(--bleu-karicool); color: #fff; border-color: var(--bleu-karicool); }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+  .btn { border-radius: 12px; padding: 10px 18px; font-weight: 800; font-size: 13.5px; border: none; }
+  .btn-primary { background: var(--bleu-karicool); color: #fff; }
+  .btn-primary:hover { background: var(--bleu-nuit); }
+  .btn-secondary { background: #fff; color: var(--bleu-karicool); border: 1px solid var(--bleu-karicool); }
+  .btn-tertiary { background: transparent; color: var(--bleu-karicool); border: none; font-weight: 700; }
+  .btn-danger { background: #fff; color: var(--erreur-fg); border: 1px solid var(--erreur); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .icon-btn { background: transparent; border: none; color: var(--texte-mute); font-size: 18px; padding: 4px 8px; border-radius: 8px; }
+  .icon-btn:hover { background: var(--nuage); }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-posted { background: var(--menthe-bg); color: var(--menthe-fg); }
+  .badge-pending { background: var(--turquoise-bg); color: var(--turquoise-fg); }
+  .badge-draft { background: var(--soleil-bg); color: var(--soleil-fg); }
+  .badge-error { background: var(--erreur-bg); color: var(--erreur-fg); }
+  .badge-instagram { background: var(--insta-bg); color: var(--insta-fg); }
+  .badge-linkedin { background: var(--linkedin-bg); color: var(--linkedin-fg); }
+
+  /* Calendar */
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .cal-header h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--bleu-nuit); text-transform: capitalize; }
+  .cal-nav { display: flex; gap: 6px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--texte-mute); text-transform: uppercase; padding-bottom: 4px; }
+  .cal-day {
+    background: var(--fond); border: 1px solid var(--bordure); border-radius: 12px; min-height: 92px;
+    padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+  }
+  .cal-day:hover { border-color: var(--bleu-ciel); }
+  .cal-day.muted { opacity: 0.4; }
+  .cal-day.today { border-color: var(--bleu-karicool); border-width: 2px; }
+  .cal-daynum { font-size: 12px; font-weight: 700; color: var(--texte-secondaire); }
+  .cal-post { font-size: 10.5px; padding: 2px 6px; border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+  .cal-post.posted { background: var(--menthe-bg); color: var(--menthe-fg); }
+  .cal-post.pending { background: var(--turquoise-bg); color: var(--turquoise-fg); }
+  .cal-post.draft { background: var(--soleil-bg); color: var(--soleil-fg); }
+  .cal-post.error { background: var(--erreur-bg); color: var(--erreur-fg); }
+  .cal-more { font-size: 10px; color: var(--texte-mute); }
+
+  /* List */
+  .list-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--bordure); background: #fff; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; color: var(--texte-secondaire); }
+  .chip.active { background: var(--bleu-nuit); color: #fff; border-color: var(--bleu-nuit); }
+  .post-card {
+    background: var(--carte); border: 1px solid var(--bordure); border-radius: 16px; padding: 16px 18px;
+    display: flex; gap: 14px; align-items: flex-start; margin-bottom: 10px; cursor: pointer; box-shadow: 0 2px 8px rgba(11,58,140,0.04);
+  }
+  .post-card:hover { border-color: var(--bleu-ciel); }
+  .post-thumb { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; background: var(--nuage); flex-shrink: 0; }
+  .post-body { flex: 1; min-width: 0; }
+  .post-top { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .post-date { font-size: 12px; color: var(--texte-mute); font-weight: 700; }
+  .post-caption { font-size: 13.5px; color: var(--texte-secondaire); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .post-metrics { display: flex; gap: 10px; margin-top: 8px; font-size: 11.5px; color: var(--texte-mute); flex-wrap: wrap; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--texte-mute); }
+
+  /* Modal / composer */
+  .overlay { position: fixed; inset: 0; background: rgba(11,58,140,0.35); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 100; }
+  .modal { background: var(--fond); border-radius: 20px; max-width: 560px; width: 100%; padding: 28px; box-shadow: 0 20px 60px rgba(11,58,140,0.25); }
+  .modal h2 { margin: 0 0 18px; font-size: 20px; font-weight: 800; color: var(--bleu-nuit); }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--texte-secondaire); margin-bottom: 6px; }
+  .field input[type=text], .field input[type=date], .field input[type=time], .field select, .field textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--bordure); border-radius: 10px; background: #fff; color: var(--texte);
+  }
+  .field textarea { min-height: 90px; resize: vertical; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field { flex: 1; }
+  .platform-toggle { display: flex; gap: 8px; }
+  .platform-toggle button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--bordure); background: #fff; font-weight: 700; color: var(--texte-secondaire); }
+  .platform-toggle button.active.instagram { background: var(--insta-bg); color: var(--insta-fg); border-color: var(--insta-fg); }
+  .platform-toggle button.active.linkedin { background: var(--linkedin-bg); color: var(--linkedin-fg); border-color: var(--linkedin-fg); }
+  .file-preview { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .file-preview img, .file-preview video { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bordure); }
+  .hint { font-size: 12px; color: var(--texte-mute); margin-top: 4px; }
+  .modal-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 22px; }
+  .modal-actions-right { display: flex; gap: 8px; }
+  .readonly-info { background: var(--nuage); border-radius: 12px; padding: 14px 16px; font-size: 13.5px; color: var(--texte-secondaire); margin-bottom: 14px; white-space: pre-wrap; }
+  .status-msg { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+  .status-msg.ok { background: var(--menthe-bg); color: var(--menthe-fg); }
+  .status-msg.err { background: var(--erreur-bg); color: var(--erreur-fg); }
+  .status-msg.busy { background: var(--nuage); color: var(--texte-mute); }
+
+  .gate { max-width: 440px; margin: 80px auto; background: var(--fond); border: 1px solid var(--bordure); border-radius: 20px; padding: 32px; text-align: center; }
+  .gate h1 { font-size: 26px; font-weight: 900; color: var(--bleu-nuit); margin: 0 0 6px; }
+  .gate h1 span { color: var(--menthe); }
+  .gate p { color: var(--texte-secondaire); font-size: 14px; line-height: 1.6; }
+  .gate input { width: 100%; padding: 12px; border: 1px solid var(--bordure); border-radius: 10px; margin: 14px 0; text-align: center; }
+
+  @media (max-width: 640px) {
+    .cal-grid { grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-day { min-height: 64px; padding: 4px; }
+    .cal-post { font-size: 9px; }
+    .topbar { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate" hidden>
+  <h1>Kari<span>cool</span></h1>
+  <p>Colle ton jeton d'accès GitHub (PAT) pour ouvrir le calendrier. Il est stocké uniquement dans ce navigateur, jamais envoyé ailleurs qu'à l'API GitHub.</p>
+  <input type="text" id="gate-pat" placeholder="github_pat_...">
+  <button class="btn btn-primary" id="gate-save" style="width:100%">Ouvrir Karicool</button>
+  <p class="hint" id="gate-error" style="color:var(--erreur-fg)"></p>
+</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <h1 class="wordmark">Kari<span>cool</span></h1>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="calendar">Calendrier</button>
+      <button class="tab-btn" data-tab="list">Liste</button>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-refresh" title="Recharger">⟳</button>
+      <button class="btn btn-primary" id="btn-new">+ Nouveau post</button>
+      <button class="icon-btn" id="btn-settings" title="Changer de jeton">⚙</button>
+    </div>
+  </div>
+
+  <main>
+    <div id="status-bar"></div>
+    <div id="view-calendar"></div>
+    <div id="view-list" hidden></div>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+(function() {
+  "use strict";
+
+  const OWNER = "karicool";
+  const REPO_SCHEDULE = "karicool";
+  const REPO_MEDIA = "karicool-media";
+  const API = "https://api.github.com";
+  const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO_MEDIA}/main`;
+
+  const STATUS_LABEL = { draft: "Brouillon", pending: "Programmé", posted: "Publié", error: "Erreur" };
+  const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  const JOURS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+
+  let PAT = null;
+  let posts = [];
+  let scheduleSha = null;
+  let currentTab = "calendar";
+  let calMonth = new Date();
+  let listFilter = { status: "all", platform: "all" };
+  let editingId = null; // post being edited, or "__new__"
+
+  // ---------- utils ----------
+  function utf8ToB64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function b64ToUtf8(str) { return decodeURIComponent(escape(atob(str.replace(/\n/g, "")))); }
+  function el(tag, attrs, children) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === "class") e.className = attrs[k];
+      else if (k === "html") e.innerHTML = attrs[k];
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(c => { if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function fmtDateTokyo(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("fr-FR", { timeZone: "Asia/Tokyo", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (Tokyo)";
+  }
+  function localInputsFromIso(iso) {
+    if (!iso) return { date: "", time: "" };
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
+    }).formatToParts(new Date(iso));
+    const get = t => parts.find(p => p.type === t).value;
+    return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+  }
+  function tokyoInputsToIso(date, time) {
+    if (!date || !time) return null;
+    // Construit un instant en heure de Tokyo (fixe, UTC+9, pas de DST) et le convertit en UTC.
+    const [y, m, d] = date.split("-").map(Number);
+    const [hh, mm] = time.split(":").map(Number);
+    const utcMs = Date.UTC(y, m - 1, d, hh, mm) - 9 * 3600 * 1000;
+    return new Date(utcMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+  function ghHeaders(extra) {
+    return Object.assign({ "Authorization": `Bearer ${PAT}`, "Accept": "application/vnd.github+json" }, extra || {});
+  }
+  function setStatus(msg, kind) {
+    const bar = document.getElementById("status-bar");
+    if (!msg) { bar.innerHTML = ""; return; }
+    bar.innerHTML = "";
+    bar.appendChild(el("div", { class: `status-msg ${kind || "busy"}` }, [msg]));
+  }
+
+  // ---------- GitHub data ----------
+  async function loadSchedule() {
+    setStatus("Chargement de schedule.json…", "busy");
+    const r = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, { headers: ghHeaders() });
+    if (!r.ok) throw new Error(`Impossible de lire schedule.json (${r.status})`);
+    const j = await r.json();
+    scheduleSha = j.sha;
+    const content = b64ToUtf8(j.content).trim();
+    posts = content ? JSON.parse(content) : [];
+    setStatus("");
+  }
+
+  async function saveSchedule(message) {
+    setStatus("Enregistrement…", "busy");
+    const body = {
+      message: message || "Mise à jour depuis l'interface Karicool",
+      content: utf8ToB64(JSON.stringify(posts, null, 2) + "\n"),
+      sha: scheduleSha,
+      branch: "main",
+    };
+    const r = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, {
+      method: "PUT", headers: ghHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok) { setStatus(`Échec de l'enregistrement : ${j.message || r.status}`, "err"); throw new Error(j.message || "save failed"); }
+    scheduleSha = j.content.sha;
+    setStatus("Enregistré.", "ok");
+    setTimeout(() => setStatus(""), 2500);
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.slice(reader.result.indexOf(",") + 1));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadMedia(file, folder) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${folder}/${Date.now()}_${safeName}`;
+    const content = await fileToBase64(file);
+    const r = await fetch(`${API}/repos/${OWNER}/${REPO_MEDIA}/contents/${encodeURIComponent(path)}`, {
+      method: "PUT", headers: ghHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ message: `upload depuis l'interface: ${safeName}`, content, branch: "main" }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(`Échec upload ${file.name} : ${j.message || r.status}`);
+    return `${RAW_BASE}/${path}`;
+  }
+
+  // ---------- rendering: calendar ----------
+  function postsByDay() {
+    const map = {};
+    posts.forEach(p => {
+      if (!p.scheduled_time) return;
+      const local = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(p.scheduled_time));
+      (map[local] = map[local] || []).push(p);
+    });
+    return map;
+  }
+
+  function renderCalendar() {
+    const root = document.getElementById("view-calendar");
+    root.innerHTML = "";
+    const year = calMonth.getFullYear(), month = calMonth.getMonth();
+    const header = el("div", { class: "cal-header" }, [
+      el("h2", {}, [`${MOIS[month]} ${year}`]),
+      el("div", { class: "cal-nav" }, [
+        el("button", { class: "btn btn-secondary", onclick: () => { calMonth = new Date(year, month - 1, 1); renderCalendar(); } }, ["←"]),
+        el("button", { class: "btn btn-secondary", onclick: () => { calMonth = new Date(); renderCalendar(); } }, ["Aujourd'hui"]),
+        el("button", { class: "btn btn-secondary", onclick: () => { calMonth = new Date(year, month + 1, 1); renderCalendar(); } }, ["→"]),
+      ]),
+    ]);
+    root.appendChild(header);
+
+    const grid = el("div", { class: "cal-grid" });
+    JOURS.forEach(j => grid.appendChild(el("div", { class: "cal-dow" }, [j])));
+
+    const firstOfMonth = new Date(year, month, 1);
+    const startOffset = (firstOfMonth.getDay() + 6) % 7; // lundi = 0
+    const gridStart = new Date(year, month, 1 - startOffset);
+    const byDay = postsByDay();
+    const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+
+    for (let i = 0; i < 42; i++) {
+      const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const key = new Intl.DateTimeFormat("en-CA").format(day);
+      const inMonth = day.getMonth() === month;
+      const dayPosts = (byDay[key] || []).sort((a,b) => a.scheduled_time.localeCompare(b.scheduled_time));
+      const cell = el("div", { class: `cal-day${inMonth ? "" : " muted"}${key === todayKey ? " today" : ""}`, onclick: () => openComposer(null, key) });
+      cell.appendChild(el("div", { class: "cal-daynum" }, [String(day.getDate())]));
+      dayPosts.slice(0, 3).forEach(p => {
+        const label = `${p.platform === "instagram" ? "📸" : "💼"} ${(p.caption || "").slice(0, 18)}`;
+        cell.appendChild(el("div", { class: `cal-post ${p.status}`, onclick: (e) => { e.stopPropagation(); openComposer(p.id); } }, [label]));
+      });
+      if (dayPosts.length > 3) cell.appendChild(el("div", { class: "cal-more" }, [`+${dayPosts.length - 3} autre(s)`]));
+      grid.appendChild(cell);
+    }
+    root.appendChild(grid);
+  }
+
+  // ---------- rendering: list ----------
+  function renderList() {
+    const root = document.getElementById("view-list");
+    root.innerHTML = "";
+    root.appendChild(el("div", { class: "list-filters" }, [
+      ...["all","draft","pending","posted","error"].map(s =>
+        el("button", { class: `chip${listFilter.status === s ? " active" : ""}`, onclick: () => { listFilter.status = s; renderList(); } },
+          [s === "all" ? "Tous les statuts" : STATUS_LABEL[s]])
+      ),
+      ...["all","instagram","linkedin"].map(pf =>
+        el("button", { class: `chip${listFilter.platform === pf ? " active" : ""}`, onclick: () => { listFilter.platform = pf; renderList(); } },
+          [pf === "all" ? "Tous les réseaux" : (pf === "instagram" ? "Instagram" : "LinkedIn")])
+      ),
+    ]));
+
+    let filtered = posts.filter(p =>
+      (listFilter.status === "all" || p.status === listFilter.status) &&
+      (listFilter.platform === "all" || p.platform === listFilter.platform)
+    );
+    filtered = filtered.slice().sort((a,b) => (b.scheduled_time || "").localeCompare(a.scheduled_time || ""));
+
+    if (filtered.length === 0) { root.appendChild(el("div", { class: "empty" }, ["Aucun post ne correspond à ces filtres."])); return; }
+
+    filtered.forEach(p => {
+      const thumbUrl = p.image_url || (p.image_urls && p.image_urls[0]) || null;
+      const card = el("div", { class: "post-card", onclick: () => openComposer(p.id) }, [
+        thumbUrl ? el("img", { class: "post-thumb", src: thumbUrl }) : el("div", { class: "post-thumb" }),
+        el("div", { class: "post-body" }, [
+          el("div", { class: "post-top" }, [
+            el("span", { class: `badge badge-${p.platform}` }, [p.platform === "instagram" ? "Instagram" : "LinkedIn"]),
+            el("span", { class: `badge badge-${p.status}` }, [STATUS_LABEL[p.status] || p.status]),
+            el("span", { class: "post-date" }, [fmtDateTokyo(p.scheduled_time)]),
+          ]),
+          el("div", { class: "post-caption" }, [p.caption || "(sans légende)"]),
+          p.metrics ? el("div", { class: "post-metrics" }, Object.entries(p.metrics).map(([k,v]) => el("span", {}, [`${k}: ${v}`]))) : null,
+        ]),
+      ]);
+      root.appendChild(card);
+    });
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    document.getElementById("view-calendar").hidden = tab !== "calendar";
+    document.getElementById("view-list").hidden = tab !== "list";
+    if (tab === "calendar") renderCalendar(); else renderList();
+  }
+
+  // ---------- composer ----------
+  function closeComposer() { document.getElementById("modal-root").innerHTML = ""; editingId = null; }
+
+  function openComposer(id, prefillDateKey) {
+    editingId = id || "__new__";
+    const existing = id ? posts.find(p => p.id === id) : null;
+    const root = document.getElementById("modal-root");
+    root.innerHTML = "";
+
+    if (existing && existing.status === "posted") {
+      const metricsTxt = existing.metrics
+        ? Object.entries(existing.metrics).map(([k,v]) => `${k} : ${v}`).join("\n") + (existing.metrics_updated_at ? `\n\n(màj ${fmtDateTokyo(existing.metrics_updated_at)})` : "")
+        : "Pas encore de statistiques (mises à jour une fois par jour).";
+      const modal = el("div", { class: "modal" }, [
+        el("h2", {}, ["Post publié"]),
+        el("div", { class: "readonly-info" }, [`${existing.caption || ""}\n\nPublié le ${fmtDateTokyo(existing.posted_at)}\n\n${metricsTxt}`]),
+        el("div", { class: "modal-actions" }, [
+          el("span"),
+          el("button", { class: "btn btn-secondary", onclick: closeComposer }, ["Fermer"]),
+        ]),
+      ]);
+      root.appendChild(el("div", { class: "overlay", onclick: (e) => { if (e.target === e.currentTarget) closeComposer(); } }, [modal]));
+      return;
+    }
+
+    const state = existing ? JSON.parse(JSON.stringify(existing)) : {
+      id: `manual-${Date.now()}`,
+      platform: "instagram",
+      media_type: "image",
+      caption: "",
+      status: "draft",
+      scheduled_time: prefillDateKey ? tokyoInputsToIso(prefillDateKey, "17:30") : null,
+    };
+    const newFiles = { files: [] };
+
+    function field(labelTxt, inputEl) { return el("div", { class: "field" }, [el("label", {}, [labelTxt]), inputEl]); }
+
+    const captionInput = el("textarea", { placeholder: "Légende du post…" }, []);
+    captionInput.value = state.caption || "";
+    captionInput.addEventListener("input", () => state.caption = captionInput.value);
+
+    const { date: initDate, time: initTime } = localInputsFromIso(state.scheduled_time);
+    const dateInput = el("input", { type: "date" }); dateInput.value = initDate;
+    const timeInput = el("input", { type: "time" }); timeInput.value = initTime || "17:30";
+
+    const mediaTypeSelect = el("select", {}, [
+      el("option", { value: "image" }, ["Image simple"]),
+      el("option", { value: "carousel" }, ["Carrousel (2 à 10 images)"]),
+      el("option", { value: "reel" }, ["Reel (vidéo)"]),
+    ]);
+    mediaTypeSelect.value = state.media_type || "image";
+
+    const statusSelect = el("select", {}, [
+      el("option", { value: "draft" }, ["Brouillon"]),
+      el("option", { value: "pending" }, ["Programmé"]),
+    ]);
+    statusSelect.value = (state.status === "posted" || state.status === "error") ? "pending" : (state.status || "draft");
+
+    const fileInput = el("input", { type: "file", multiple: "" });
+    const filePreview = el("div", { class: "file-preview" });
+    function refreshMediaAccept() {
+      if (state.platform === "linkedin") { fileInput.accept = "image/*"; fileInput.removeAttribute("multiple"); }
+      else if (mediaTypeSelect.value === "carousel") { fileInput.accept = "image/*"; fileInput.setAttribute("multiple", ""); }
+      else if (mediaTypeSelect.value === "reel") { fileInput.accept = "video/*"; fileInput.removeAttribute("multiple"); }
+      else { fileInput.accept = "image/*"; fileInput.removeAttribute("multiple"); }
+    }
+    fileInput.addEventListener("change", () => {
+      newFiles.files = Array.from(fileInput.files);
+      filePreview.innerHTML = "";
+      newFiles.files.forEach(f => {
+        const url = URL.createObjectURL(f);
+        filePreview.appendChild(f.type.startsWith("video") ? el("video", { src: url, muted: "" }) : el("img", { src: url }));
+      });
+    });
+
+    const mediaTypeField = field("Type de contenu (Instagram)", mediaTypeSelect);
+    const fileField = field("Nouveau visuel (depuis ton Mac — laisser vide pour garder le visuel actuel)", (() => {
+      const wrap = el("div", {}, [fileInput, filePreview]);
+      return wrap;
+    })());
+
+    function currentMediaSummary() {
+      if (state.image_url) return el("div", { class: "hint" }, ["Visuel actuel : 1 image"]);
+      if (state.image_urls) return el("div", { class: "hint" }, [`Visuel actuel : carrousel de ${state.image_urls.length} image(s)`]);
+      if (state.video_url) return el("div", { class: "hint" }, ["Visuel actuel : 1 vidéo"]);
+      return null;
+    }
+
+    const platformToggle = el("div", { class: "platform-toggle" }, [
+      el("button", { class: `instagram${state.platform === "instagram" ? " active" : ""}`, onclick: () => { state.platform = "instagram"; rebuildMediaSection(); } }, ["Instagram"]),
+      el("button", { class: `linkedin${state.platform === "linkedin" ? " active" : ""}`, onclick: () => { state.platform = "linkedin"; rebuildMediaSection(); } }, ["LinkedIn"]),
+    ]);
+
+    const mediaSectionRoot = el("div");
+    function rebuildMediaSection() {
+      platformToggle.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.classList.contains(state.platform)));
+      mediaSectionRoot.innerHTML = "";
+      if (state.platform === "instagram") mediaSectionRoot.appendChild(mediaTypeField);
+      const summary = currentMediaSummary();
+      if (summary) mediaSectionRoot.appendChild(summary);
+      mediaSectionRoot.appendChild(fileField);
+      refreshMediaAccept();
+    }
+    mediaTypeSelect.addEventListener("change", () => { state.media_type = mediaTypeSelect.value; refreshMediaAccept(); });
+
+    const errBox = el("div");
+
+    const modal = el("div", { class: "modal" }, [
+      el("h2", {}, [existing ? "Modifier le post" : "Nouveau post"]),
+      errBox,
+      field("Réseau", platformToggle),
+      mediaSectionRoot,
+      field("Légende", captionInput),
+      el("div", { class: "field-row" }, [field("Date (heure de Tokyo)", dateInput), field("Heure (Tokyo)", timeInput)]),
+      field("Statut", statusSelect),
+      el("div", { class: "modal-actions" }, [
+        existing ? el("button", { class: "btn btn-danger", onclick: async () => {
+          if (!confirm("Supprimer définitivement ce post ?")) return;
+          posts = posts.filter(p => p.id !== existing.id);
+          try { await saveSchedule(`suppression: ${existing.id}`); closeComposer(); switchTab(currentTab); }
+          catch (e) { errBox.appendChild(el("div", { class: "status-msg err" }, [String(e.message || e)])); }
+        } }, ["Supprimer"]) : el("span"),
+        el("div", { class: "modal-actions-right" }, [
+          el("button", { class: "btn btn-secondary", onclick: closeComposer }, ["Annuler"]),
+          el("button", { class: "btn btn-primary", id: "composer-save", onclick: async () => {
+            errBox.innerHTML = "";
+            state.caption = captionInput.value;
+            state.status = statusSelect.value;
+            state.scheduled_time = tokyoInputsToIso(dateInput.value, timeInput.value);
+            if (!state.scheduled_time) { errBox.appendChild(el("div", { class: "status-msg err" }, ["Date et heure requises."])); return; }
+            if (state.platform === "instagram") state.media_type = mediaTypeSelect.value; else delete state.media_type;
+
+            try {
+              if (newFiles.files.length > 0) {
+                errBox.appendChild(el("div", { class: "status-msg busy", id: "upload-status" }, [`Envoi de ${newFiles.files.length} fichier(s)…`]));
+                const folder = (dateInput.value || "divers").slice(0, 7);
+                if (state.platform === "instagram" && state.media_type === "carousel") {
+                  if (newFiles.files.length < 2 || newFiles.files.length > 10) throw new Error(`Un carrousel accepte de 2 à 10 images (${newFiles.files.length} fournies).`);
+                  delete state.image_url; delete state.video_url;
+                  state.image_urls = [];
+                  for (const f of newFiles.files) state.image_urls.push(await uploadMedia(f, folder));
+                } else if (state.platform === "instagram" && state.media_type === "reel") {
+                  delete state.image_url; delete state.image_urls;
+                  state.video_url = await uploadMedia(newFiles.files[0], folder);
+                } else {
+                  delete state.image_urls; delete state.video_url;
+                  state.image_url = await uploadMedia(newFiles.files[0], folder);
+                }
+              }
+              const idx = posts.findIndex(p => p.id === state.id);
+              if (idx >= 0) posts[idx] = state; else posts.push(state);
+              await saveSchedule(existing ? `modification: ${state.id}` : `nouveau post: ${state.id}`);
+              closeComposer();
+              switchTab(currentTab);
+            } catch (e) {
+              errBox.innerHTML = "";
+              errBox.appendChild(el("div", { class: "status-msg err" }, [String(e.message || e)]));
+            }
+          } }, [existing ? "Enregistrer" : "Créer"]),
+        ]),
+      ]),
+    ]);
+    root.appendChild(el("div", { class: "overlay", onclick: (e) => { if (e.target === e.currentTarget) closeComposer(); } }, [modal]));
+    rebuildMediaSection();
+  }
+
+  // ---------- boot ----------
+  async function boot() {
+    document.getElementById("btn-refresh").addEventListener("click", async () => {
+      try { await loadSchedule(); switchTab(currentTab); } catch (e) { setStatus(String(e.message || e), "err"); }
+    });
+    document.getElementById("btn-new").addEventListener("click", () => openComposer(null));
+    document.getElementById("btn-settings").addEventListener("click", () => {
+      if (confirm("Effacer le jeton GitHub enregistré dans ce navigateur ?")) { localStorage.removeItem("karicool_pat"); location.reload(); }
+    });
+    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+    try {
+      await loadSchedule();
+      switchTab("calendar");
+    } catch (e) {
+      setStatus(`${e.message || e}`, "err");
+    }
+  }
+
+  function tryGate() {
+    const saved = localStorage.getItem("karicool_pat");
+    if (saved) {
+      PAT = saved;
+      document.getElementById("app").hidden = false;
+      boot();
+      return;
+    }
+    document.getElementById("gate").hidden = false;
+    document.getElementById("gate-save").addEventListener("click", async () => {
+      const val = document.getElementById("gate-pat").value.trim();
+      if (!val) return;
+      PAT = val;
+      const r = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, { headers: ghHeaders() });
+      if (!r.ok) {
+        document.getElementById("gate-error").textContent = "Ce jeton ne fonctionne pas (vérifie qu'il a accès en lecture/écriture aux dépôts karicool et karicool-media).";
+        return;
+      }
+      localStorage.setItem("karicool_pat", val);
+      document.getElementById("gate").hidden = true;
+      document.getElementById("app").hidden = false;
+      boot();
+    });
+  }
+
+  tryGate();
+})();
+</script>
+</body>
+</html>
