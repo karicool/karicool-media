@@ -591,6 +591,13 @@
             if (!state.scheduled_time) { errBox.appendChild(el("div", { class: "status-msg err" }, ["Date et heure requises."])); return; }
             if (state.platform === "instagram") state.media_type = mediaTypeSelect.value; else delete state.media_type;
 
+            const hasExistingMedia = !!(state.image_url || (state.image_urls && state.image_urls.length) || state.video_url);
+            const hasNewFiles = newFiles.files.length > 0;
+            if (state.platform === "instagram" && state.status === "pending" && !hasExistingMedia && !hasNewFiles) {
+              errBox.appendChild(el("div", { class: "status-msg err" }, ["Un post Instagram programmé doit avoir un visuel — ajoute une image/vidéo, ou repasse-le en brouillon."]));
+              return;
+            }
+
             try {
               if (newFiles.files.length > 0) {
                 errBox.appendChild(el("div", { class: "status-msg busy", id: "upload-status" }, [`Envoi de ${newFiles.files.length} fichier(s)…`]));
