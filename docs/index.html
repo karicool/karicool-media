@@ -218,26 +218,40 @@
     (children || []).forEach(c => { if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
     return e;
   }
-  function fmtDateTokyo(iso) {
+  const REF_TZ = "Europe/Paris"; // heure de référence : celle de la publication (France), pas celle de Karim (Tokyo)
+
+  function fmtDateRef(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
-    return d.toLocaleString("fr-FR", { timeZone: "Asia/Tokyo", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (Tokyo)";
+    return d.toLocaleString("fr-FR", { timeZone: REF_TZ, day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (Paris)";
   }
   function localInputsFromIso(iso) {
     if (!iso) return { date: "", time: "" };
     const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
+      timeZone: REF_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
     }).formatToParts(new Date(iso));
     const get = t => parts.find(p => p.type === t).value;
     return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
   }
-  function tokyoInputsToIso(date, time) {
+  function parisInputsToIso(date, time) {
     if (!date || !time) return null;
-    // Construit un instant en heure de Tokyo (fixe, UTC+9, pas de DST) et le convertit en UTC.
+    // Construit un instant en heure de Paris (CET/CEST, DST géré) et le convertit en UTC.
+    // Méthode : on part d'une estimation, on regarde quelle heure murale elle donne à Paris,
+    // puis on corrige l'écart. Deux passes suffisent même autour d'un changement d'heure.
     const [y, m, d] = date.split("-").map(Number);
     const [hh, mm] = time.split(":").map(Number);
-    const utcMs = Date.UTC(y, m - 1, d, hh, mm) - 9 * 3600 * 1000;
-    return new Date(utcMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const wantMs = Date.UTC(y, m - 1, d, hh, mm, 0);
+    let guessMs = wantMs;
+    for (let i = 0; i < 2; i++) {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: REF_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+      }).formatToParts(new Date(guessMs));
+      const get = t => parseInt(parts.find(p => p.type === t).value, 10);
+      const hour24 = get("hour") === 24 ? 0 : get("hour");
+      const gotMs = Date.UTC(get("year"), get("month") - 1, get("day"), hour24, get("minute"), get("second"));
+      guessMs += (wantMs - gotMs);
+    }
+    return new Date(guessMs).toISOString().replace(/\.\d{3}Z$/, "Z");
   }
   function ghHeaders(extra) {
     return Object.assign({ "Authorization": `Bearer ${PAT}`, "Accept": "application/vnd.github+json" }, extra || {});
@@ -306,7 +320,7 @@
     const map = {};
     posts.forEach(p => {
       if (!p.scheduled_time) return;
-      const local = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(p.scheduled_time));
+      const local = new Intl.DateTimeFormat("en-CA", { timeZone: REF_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(p.scheduled_time));
       (map[local] = map[local] || []).push(p);
     });
     return map;
@@ -333,7 +347,7 @@
     const startOffset = (firstOfMonth.getDay() + 6) % 7; // lundi = 0
     const gridStart = new Date(year, month, 1 - startOffset);
     const byDay = postsByDay();
-    const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+    const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: REF_TZ }).format(new Date());
 
     for (let i = 0; i < 42; i++) {
       const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
@@ -383,7 +397,7 @@
           el("div", { class: "post-top" }, [
             el("span", { class: `badge badge-${p.platform}` }, [p.platform === "instagram" ? "Instagram" : "LinkedIn"]),
             el("span", { class: `badge badge-${p.status}` }, [STATUS_LABEL[p.status] || p.status]),
-            el("span", { class: "post-date" }, [fmtDateTokyo(p.scheduled_time)]),
+            el("span", { class: "post-date" }, [fmtDateRef(p.scheduled_time)]),
           ]),
           el("div", { class: "post-caption" }, [p.caption || "(sans légende)"]),
           p.metrics ? el("div", { class: "post-metrics" }, Object.entries(p.metrics).map(([k,v]) => el("span", {}, [`${k}: ${v}`]))) : null,
@@ -412,11 +426,11 @@
 
     if (existing && existing.status === "posted") {
       const metricsTxt = existing.metrics
-        ? Object.entries(existing.metrics).map(([k,v]) => `${k} : ${v}`).join("\n") + (existing.metrics_updated_at ? `\n\n(màj ${fmtDateTokyo(existing.metrics_updated_at)})` : "")
+        ? Object.entries(existing.metrics).map(([k,v]) => `${k} : ${v}`).join("\n") + (existing.metrics_updated_at ? `\n\n(màj ${fmtDateRef(existing.metrics_updated_at)})` : "")
         : "Pas encore de statistiques (mises à jour une fois par jour).";
       const modal = el("div", { class: "modal" }, [
         el("h2", {}, ["Post publié"]),
-        el("div", { class: "readonly-info" }, [`${existing.caption || ""}\n\nPublié le ${fmtDateTokyo(existing.posted_at)}\n\n${metricsTxt}`]),
+        el("div", { class: "readonly-info" }, [`${existing.caption || ""}\n\nPublié le ${fmtDateRef(existing.posted_at)}\n\n${metricsTxt}`]),
         el("div", { class: "modal-actions" }, [
           el("span"),
           el("button", { class: "btn btn-secondary", onclick: closeComposer }, ["Fermer"]),
@@ -432,7 +446,7 @@
       media_type: "image",
       caption: "",
       status: "draft",
-      scheduled_time: prefillDateKey ? tokyoInputsToIso(prefillDateKey, "17:30") : null,
+      scheduled_time: prefillDateKey ? parisInputsToIso(prefillDateKey, "17:30") : null,
     };
     const newFiles = { files: [] };
 
@@ -514,7 +528,7 @@
       field("Réseau", platformToggle),
       mediaSectionRoot,
       field("Légende", captionInput),
-      el("div", { class: "field-row" }, [field("Date (heure de Tokyo)", dateInput), field("Heure (Tokyo)", timeInput)]),
+      el("div", { class: "field-row" }, [field("Date (heure de Paris)", dateInput), field("Heure (Paris)", timeInput)]),
       field("Statut", statusSelect),
       el("div", { class: "modal-actions" }, [
         existing ? el("button", { class: "btn btn-danger", onclick: async () => {
@@ -529,7 +543,7 @@
             errBox.innerHTML = "";
             state.caption = captionInput.value;
             state.status = statusSelect.value;
-            state.scheduled_time = tokyoInputsToIso(dateInput.value, timeInput.value);
+            state.scheduled_time = parisInputsToIso(dateInput.value, timeInput.value);
             if (!state.scheduled_time) { errBox.appendChild(el("div", { class: "status-msg err" }, ["Date et heure requises."])); return; }
             if (state.platform === "instagram") state.media_type = mediaTypeSelect.value; else delete state.media_type;
 
