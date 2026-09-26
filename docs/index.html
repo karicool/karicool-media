@@ -533,9 +533,15 @@
     mediaTypeSelect.addEventListener("change", () => { state.media_type = mediaTypeSelect.value; refreshMediaAccept(); });
 
     const errBox = el("div");
+    const errorBanner = (existing && existing.status === "error")
+      ? el("div", { class: "status-msg err" }, [
+          `Échec de la dernière tentative de publication : ${existing.error_message || "raison non précisée"}`,
+        ])
+      : null;
 
     const modal = el("div", { class: "modal" }, [
       el("h2", {}, [existing ? "Modifier le post" : "Nouveau post"]),
+      errorBanner,
       errBox,
       field("Réseau", platformToggle),
       mediaSectionRoot,
