@@ -280,22 +280,46 @@
     setStatus("");
   }
 
-  async function saveSchedule(message) {
+  // Recharge toujours schedule.json juste avant d'écrire, applique la modification
+  // demandée (mutator) sur cette version fraîche, puis enregistre. Le robot de
+  // publication (publish.py) réécrit schedule.json toutes les 30 minutes : sans ça,
+  // une modification depuis l'interface pourrait entrer en conflit (409, sha périmé)
+  // et écraser silencieusement les changements du robot ou échouer avec un message
+  // peu clair. En cas de conflit malgré tout (fenêtre de course), on retente une fois.
+  async function commitScheduleChange(mutator, message) {
     setStatus("Enregistrement…", "busy");
-    const body = {
-      message: message || "Mise à jour depuis l'interface Karicool",
-      content: utf8ToB64(JSON.stringify(posts, null, 2) + "\n"),
-      sha: scheduleSha,
-      branch: "main",
-    };
-    const r = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, {
-      method: "PUT", headers: ghHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body),
-    });
-    const j = await r.json();
-    if (!r.ok) { setStatus(`Échec de l'enregistrement : ${j.message || r.status}`, "err"); throw new Error(j.message || "save failed"); }
-    scheduleSha = j.content.sha;
-    setStatus("Enregistré.", "ok");
-    setTimeout(() => setStatus(""), 2500);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r0 = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, { headers: ghHeaders() });
+      if (!r0.ok) { setStatus(`Impossible de relire schedule.json (${r0.status})`, "err"); throw new Error("reload failed"); }
+      const j0 = await r0.json();
+      const freshSha = j0.sha;
+      const freshPosts = JSON.parse(b64ToUtf8(j0.content).trim() || "[]");
+      const newPosts = mutator(freshPosts);
+
+      const body = {
+        message: message || "Mise à jour depuis l'interface Karicool",
+        content: utf8ToB64(JSON.stringify(newPosts, null, 2) + "\n"),
+        sha: freshSha,
+        branch: "main",
+      };
+      const r = await fetch(`${API}/repos/${OWNER}/${REPO_SCHEDULE}/contents/schedule.json`, {
+        method: "PUT", headers: ghHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (r.ok) {
+        posts = newPosts;
+        scheduleSha = j.content.sha;
+        setStatus("Enregistré.", "ok");
+        setTimeout(() => setStatus(""), 2500);
+        return;
+      }
+      if (r.status === 409 && attempt === 0) {
+        setStatus("Le fichier a été modifié entretemps (sûrement par la publication automatique) — nouvelle tentative…", "busy");
+        continue;
+      }
+      setStatus(`Échec de l'enregistrement : ${j.message || r.status}`, "err");
+      throw new Error(j.message || "save failed");
+    }
   }
 
   function fileToBase64(file) {
@@ -551,8 +575,10 @@
       el("div", { class: "modal-actions" }, [
         existing ? el("button", { class: "btn btn-danger", onclick: async () => {
           if (!confirm("Supprimer définitivement ce post ?")) return;
-          posts = posts.filter(p => p.id !== existing.id);
-          try { await saveSchedule(`suppression: ${existing.id}`); closeComposer(); switchTab(currentTab); }
+          try {
+            await commitScheduleChange(fresh => fresh.filter(p => p.id !== existing.id), `suppression: ${existing.id}`);
+            closeComposer(); switchTab(currentTab);
+          }
           catch (e) { errBox.appendChild(el("div", { class: "status-msg err" }, [String(e.message || e)])); }
         } }, ["Supprimer"]) : el("span"),
         el("div", { class: "modal-actions-right" }, [
@@ -582,9 +608,12 @@
                   state.image_url = await uploadMedia(newFiles.files[0], folder);
                 }
               }
-              const idx = posts.findIndex(p => p.id === state.id);
-              if (idx >= 0) posts[idx] = state; else posts.push(state);
-              await saveSchedule(existing ? `modification: ${state.id}` : `nouveau post: ${state.id}`);
+              await commitScheduleChange(fresh => {
+                const idx = fresh.findIndex(p => p.id === state.id);
+                const copy = fresh.slice();
+                if (idx >= 0) copy[idx] = state; else copy.push(state);
+                return copy;
+              }, existing ? `modification: ${state.id}` : `nouveau post: ${state.id}`);
               closeComposer();
               switchTab(currentTab);
             } catch (e) {
