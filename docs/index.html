@@ -108,6 +108,19 @@
   .post-metrics { display: flex; gap: 10px; margin-top: 8px; font-size: 11.5px; color: var(--texte-mute); flex-wrap: wrap; }
   .empty { text-align: center; padding: 60px 20px; color: var(--texte-mute); }
 
+  /* Sélection groupée */
+  .bulk-bar { display: flex; align-items: center; gap: 14px; background: var(--fond); border: 1px solid var(--bordure); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: var(--texte-secondaire); font-weight: 700; flex-wrap: wrap; }
+  .bulk-bar label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .bulk-bar #bulk-count { margin-left: auto; color: var(--texte-mute); font-weight: 700; }
+  .post-check { width: 16px; height: 16px; margin-top: 4px; flex-shrink: 0; }
+
+  /* Insights */
+  .insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; }
+  .insight-card { background: var(--carte); border: 1px solid var(--bordure); border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(11,58,140,0.04); }
+  .insight-value { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 26px; color: var(--bleu-nuit); }
+  .insight-label { font-size: 12px; color: var(--texte-mute); font-weight: 700; margin-top: 4px; }
+  .insight-section-title { margin: 28px 0 12px; font-size: 18px; font-weight: 800; color: var(--bleu-nuit); }
+
   /* Modal / composer */
   .overlay { position: fixed; inset: 0; background: rgba(11,58,140,0.35); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 100; }
   .modal { background: var(--fond); border-radius: 20px; max-width: 560px; width: 100%; padding: 28px; box-shadow: 0 20px 60px rgba(11,58,140,0.25); }
@@ -177,6 +190,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="calendar">Calendrier</button>
       <button class="tab-btn" data-tab="list">Liste</button>
+      <button class="tab-btn" data-tab="insights">Insights</button>
     </div>
     <div class="topbar-actions">
       <button class="icon-btn" id="btn-refresh" title="Recharger">⟳</button>
@@ -189,6 +203,7 @@
     <div id="status-bar"></div>
     <div id="view-calendar"></div>
     <div id="view-list" hidden></div>
+    <div id="view-insights" hidden></div>
   </main>
 </div>
 
@@ -215,6 +230,7 @@
   let calMonth = new Date();
   let listFilter = { status: "all", platform: "all" };
   let editingId = null; // post being edited, or "__new__"
+  let selectedIds = new Set(); // sélection groupée dans la vue Liste (brouillons uniquement)
 
   // ---------- utils ----------
   function utf8ToB64(str) { return btoa(unescape(encodeURIComponent(str))); }
@@ -408,11 +424,11 @@
     root.innerHTML = "";
     root.appendChild(el("div", { class: "list-filters" }, [
       ...["all","draft","pending","posted","error"].map(s =>
-        el("button", { class: `chip${listFilter.status === s ? " active" : ""}`, onclick: () => { listFilter.status = s; renderList(); } },
+        el("button", { class: `chip${listFilter.status === s ? " active" : ""}`, onclick: () => { listFilter.status = s; selectedIds.clear(); renderList(); } },
           [s === "all" ? "Tous les statuts" : STATUS_LABEL[s]])
       ),
       ...["all","instagram","linkedin"].map(pf =>
-        el("button", { class: `chip${listFilter.platform === pf ? " active" : ""}`, onclick: () => { listFilter.platform = pf; renderList(); } },
+        el("button", { class: `chip${listFilter.platform === pf ? " active" : ""}`, onclick: () => { listFilter.platform = pf; selectedIds.clear(); renderList(); } },
           [pf === "all" ? "Tous les réseaux" : (pf === "instagram" ? "Instagram" : "LinkedIn")])
       ),
     ]));
@@ -423,11 +439,46 @@
     );
     filtered = filtered.slice().sort((a,b) => (b.scheduled_time || "").localeCompare(a.scheduled_time || ""));
 
+    // La sélection groupée ne porte que sur les brouillons actuellement affichés par les filtres.
+    const draftIdsVisible = filtered.filter(p => p.status === "draft").map(p => p.id);
+    Array.from(selectedIds).forEach(id => { if (!draftIdsVisible.includes(id)) selectedIds.delete(id); });
+
+    if (draftIdsVisible.length > 0) {
+      const allSelected = draftIdsVisible.every(id => selectedIds.has(id));
+      const selectAllCb = el("input", { type: "checkbox" });
+      selectAllCb.checked = allSelected;
+      selectAllCb.addEventListener("change", () => {
+        if (selectAllCb.checked) draftIdsVisible.forEach(id => selectedIds.add(id));
+        else draftIdsVisible.forEach(id => selectedIds.delete(id));
+        renderList();
+      });
+      const bulkValidateBtn = el("button", { class: "btn btn-primary", id: "bulk-validate", onclick: bulkValidateSelected }, ["Passer en programmé"]);
+      bulkValidateBtn.disabled = selectedIds.size === 0;
+      root.appendChild(el("div", { class: "bulk-bar" }, [
+        el("label", {}, [selectAllCb, `Sélectionner tous les brouillons affichés (${draftIdsVisible.length})`]),
+        el("span", { id: "bulk-count" }, [selectedIds.size ? `${selectedIds.size} sélectionné(s)` : ""]),
+        bulkValidateBtn,
+      ]));
+    }
+
     if (filtered.length === 0) { root.appendChild(el("div", { class: "empty" }, ["Aucun post ne correspond à ces filtres."])); return; }
 
     filtered.forEach(p => {
       const thumbUrl = p.image_url || (p.image_urls && p.image_urls[0]) || null;
+      let checkboxOrSpacer;
+      if (p.status === "draft") {
+        const cb = el("input", { type: "checkbox", class: "post-check", onclick: (e) => {
+          e.stopPropagation();
+          if (e.target.checked) selectedIds.add(p.id); else selectedIds.delete(p.id);
+          updateBulkBar();
+        } });
+        cb.checked = selectedIds.has(p.id);
+        checkboxOrSpacer = cb;
+      } else {
+        checkboxOrSpacer = el("span", { class: "post-check" });
+      }
       const card = el("div", { class: "post-card", onclick: () => openComposer(p.id) }, [
+        checkboxOrSpacer,
         thumbUrl ? el("img", { class: "post-thumb", src: thumbUrl }) : el("div", { class: "post-thumb" }),
         el("div", { class: "post-body" }, [
           el("div", { class: "post-top" }, [
@@ -443,12 +494,149 @@
     });
   }
 
+  function updateBulkBar() {
+    const count = document.getElementById("bulk-count");
+    const btn = document.getElementById("bulk-validate");
+    if (count) count.textContent = selectedIds.size ? `${selectedIds.size} sélectionné(s)` : "";
+    if (btn) btn.disabled = selectedIds.size === 0;
+  }
+
+  // Fait passer les brouillons sélectionnés en "programmé" (pending), en gardant leur
+  // date déjà fixée. Ignore (et signale) tout post sans date, ou tout post Instagram
+  // sans visuel — mêmes garde-fous que dans le composeur, pour ne jamais créer un
+  // "programmé" invalide en masse.
+  async function bulkValidateSelected() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    let skipped = [];
+    try {
+      await commitScheduleChange(fresh => {
+        skipped = [];
+        return fresh.map(p => {
+          if (!ids.includes(p.id) || p.status !== "draft") return p;
+          if (!p.scheduled_time) { skipped.push(p.id); return p; }
+          const hasMedia = !!(p.image_url || (p.image_urls && p.image_urls.length) || p.video_url);
+          if (p.platform === "instagram" && !hasMedia) { skipped.push(p.id); return p; }
+          return Object.assign({}, p, { status: "pending" });
+        });
+      }, `validation groupée: ${ids.length} post(s)`);
+      selectedIds.clear();
+      if (skipped.length) {
+        setStatus(`${ids.length - skipped.length} post(s) passé(s) en programmé. ${skipped.length} ignoré(s) (date ou visuel manquant).`, "err");
+      }
+      renderList();
+    } catch (e) {
+      setStatus(String(e.message || e), "err");
+    }
+  }
+
+  // ---------- rendering: insights ----------
+  function instaPostedWithMetrics() {
+    return posts.filter(p => p.platform === "instagram" && p.status === "posted" && p.metrics && typeof p.metrics === "object");
+  }
+  function metricScore(p) {
+    const m = p.metrics || {};
+    if (typeof m.total_interactions === "number") return m.total_interactions;
+    if (typeof m.reach === "number") return m.reach;
+    return (Number(m.likes) || 0) + (Number(m.comments) || 0);
+  }
+  function dayHourOf(iso) {
+    const d = new Date(iso);
+    const parts = new Intl.DateTimeFormat("fr-FR", { timeZone: REF_TZ, weekday: "long", hour: "2-digit", hour12: false }).formatToParts(d);
+    const weekday = parts.find(p => p.type === "weekday").value;
+    let hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+    if (hour === 24) hour = 0;
+    return { weekday, hour };
+  }
+  function bestMoment(list) {
+    if (list.length < 3) return null;
+    const byDay = {}, byHour = {};
+    list.forEach(p => {
+      const iso = p.posted_at || p.scheduled_time;
+      if (!iso) return;
+      const { weekday, hour } = dayHourOf(iso);
+      const score = metricScore(p);
+      (byDay[weekday] = byDay[weekday] || []).push(score);
+      (byHour[hour] = byHour[hour] || []).push(score);
+    });
+    const avg = arr => arr.reduce((a,b) => a + b, 0) / arr.length;
+    const bestOf = obj => Object.entries(obj).map(([k,v]) => [k, avg(v), v.length]).sort((a,b) => b[1] - a[1])[0];
+    const bd = bestOf(byDay), bh = bestOf(byHour);
+    if (!bd || !bh) return null;
+    return { day: bd, hour: bh };
+  }
+
+  function renderInsights() {
+    const root = document.getElementById("view-insights");
+    root.innerHTML = "";
+    root.appendChild(el("h2", { style: "margin:0 0 4px;font-size:20px;font-weight:800;color:var(--bleu-nuit)" }, ["Insights Instagram"]));
+    root.appendChild(el("p", { class: "hint", style: "margin-bottom:20px" }, ["Basé sur schedule.json (posts publiés récents). Les posts archivés après 60 jours ne sont pas comptés ici."]));
+
+    const list = instaPostedWithMetrics();
+    if (list.length === 0) {
+      root.appendChild(el("div", { class: "empty" }, ["Aucun post Instagram publié avec statistiques pour l'instant. Les stats se remplissent automatiquement, une fois par jour, une fois qu'un post est publié."]));
+      return;
+    }
+
+    const sum = key => list.reduce((a,p) => a + (Number(p.metrics[key]) || 0), 0);
+    const nReach = list.filter(p => typeof p.metrics.reach === "number").length;
+    const totalReach = sum("reach");
+
+    const cards = [
+      ["Posts publiés (avec stats)", String(list.length)],
+      ["Reach total", totalReach.toLocaleString("fr-FR")],
+      ["Reach moyen / post", nReach ? Math.round(totalReach / nReach).toLocaleString("fr-FR") : "—"],
+      ["Likes moyens / post", Math.round(sum("likes") / list.length).toLocaleString("fr-FR")],
+      ["Commentaires moyens / post", (sum("comments") / list.length).toFixed(1)],
+      ["Enregistrements moyens / post", Math.round(sum("saved") / list.length).toLocaleString("fr-FR")],
+      ["Partages moyens / post", Math.round(sum("shares") / list.length).toLocaleString("fr-FR")],
+    ];
+    root.appendChild(el("div", { class: "insight-grid" }, cards.map(([label, value]) =>
+      el("div", { class: "insight-card" }, [
+        el("div", { class: "insight-value" }, [value]),
+        el("div", { class: "insight-label" }, [label]),
+      ])
+    )));
+
+    root.appendChild(el("div", { class: "insight-section-title" }, ["Meilleur moment pour publier"]));
+    const moment = bestMoment(list);
+    if (moment) {
+      root.appendChild(el("div", { class: "readonly-info" }, [
+        `D'après ${list.length} post(s) publié(s) avec statistiques : le jour le plus efficace en moyenne semble être le ${moment.day[0]} (${Math.round(moment.day[1]).toLocaleString("fr-FR")} interactions en moyenne, sur ${moment.day[2]} post(s)), et l'heure la plus efficace autour de ${moment.hour[0]}h, heure de Paris (${Math.round(moment.hour[1]).toLocaleString("fr-FR")} en moyenne, sur ${moment.hour[2]} post(s)).\n\nÀ prendre comme une observation provisoire tant que l'historique est court — ça se précisera avec plus de posts.`
+      ]));
+    } else {
+      root.appendChild(el("div", { class: "readonly-info" }, [
+        "Pas encore assez de posts publiés avec statistiques (minimum 3) pour dégager une tendance fiable. Reviens quand tu auras plus d'historique."
+      ]));
+    }
+
+    root.appendChild(el("div", { class: "insight-section-title" }, ["Meilleurs posts"]));
+    const top = list.slice().sort((a,b) => metricScore(b) - metricScore(a)).slice(0, 5);
+    top.forEach(p => {
+      const thumbUrl = p.image_url || (p.image_urls && p.image_urls[0]) || null;
+      root.appendChild(el("div", { class: "post-card", onclick: () => openComposer(p.id) }, [
+        thumbUrl ? el("img", { class: "post-thumb", src: thumbUrl }) : el("div", { class: "post-thumb" }),
+        el("div", { class: "post-body" }, [
+          el("div", { class: "post-top" }, [
+            el("span", { class: "post-date" }, [fmtDateRef(p.posted_at)]),
+          ]),
+          el("div", { class: "post-caption" }, [p.caption || "(sans légende)"]),
+          el("div", { class: "post-metrics" }, Object.entries(p.metrics).map(([k,v]) => el("span", {}, [`${k}: ${v}`]))),
+        ]),
+      ]));
+    });
+  }
+
   function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     document.getElementById("view-calendar").hidden = tab !== "calendar";
     document.getElementById("view-list").hidden = tab !== "list";
-    if (tab === "calendar") renderCalendar(); else renderList();
+    document.getElementById("view-insights").hidden = tab !== "insights";
+    selectedIds.clear();
+    if (tab === "calendar") renderCalendar();
+    else if (tab === "list") renderList();
+    else renderInsights();
   }
 
   // ---------- composer ----------
